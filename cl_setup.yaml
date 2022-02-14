@@ -1,0 +1,76 @@
+#cloud-config
+groups:
+  - ubuntu: [root,sys]
+  - docker
+
+# Add users to the system. Users are added after groups are added.
+users:
+  - default
+  - name: cl
+    gecos: cl
+    shell: /bin/bash
+    primary_group: docker
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+write_files:
+  - path: /home/.env
+    content: |
+      ROOT=/chainlink
+      LOG_LEVEL=debug
+      ETH_CHAIN_ID=4
+      CHAINLINK_TLS_PORT=0
+      SECURE_COOKIES=false
+      ALLOW_ORIGINS=*
+  - path: /home/docker-compose.yaml
+    content: |
+      version: "3.4"
+      x-logging: &logging
+        logging:
+          driver: json-file
+          options:
+            max-size: 10m
+            max-file: "3"
+      
+      services:
+        chainlink:
+          restart: unless-stopped
+          stop_grace_period: 3m
+          image: smartcontract/chainlink:${cl_client_version}
+          container_name: chainlink
+          env-file:
+            - /chainlink.env
+          volumes:
+            - /home/cl/.chainlink_${network}:/chainlink
+            - /etc/localtime:/etc/localtime:ro
+          ports:
+            - 6688:6688/tcp
+          networks:
+            - chainlink
+          command: chainlink local n -p /chainlink/.password -a /chainlink/.api
+          <<: *logging
+      networks:
+        chainlink:
+          driver: bridge
+          driver_opts:
+            com.docker.network.enable_ipv4: "true"
+
+runcmd:
+  - sudo apt remove --purge --assume-yes snapd
+  - sudo apt update && sudo apt -y dist-upgrade
+  - sudo apt install -y docker-compose
+  - sudo systemctl enable --now docker
+  - sudo timedatectl set-ntp no
+  - sudo apt update && sudo apt install ntp -y
+  - mkdir /home/cl/.chainlink_${network}
+  - echo "${api_user}" > /home/cl/.chainlink_${network}/.api
+  - echo "${api_pw}" >> /home/cl/.chainlink_${network}/.api
+  - echo "${wallet_pw}" > /home/cl/.chainlink_${network}/.password
+  - echo "DATABASE_URL=${db_conn_str}" >> /home/cl/.chainlink_${network}/.env
+  - mv /home/.env /home/cl/.chainlink_${network}/.env
+  - mv /home/docker-compose.yaml /home/cl/.chainlink_${network}/docker-compose.yaml
+  - chown cl:docker -R /home/cl
+  - cd /home/cl/.chainlink_${network} && docker-compose up -d
