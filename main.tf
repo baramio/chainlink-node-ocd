@@ -78,6 +78,7 @@ resource "digitalocean_droplet" "internet_gateway1" {
   size       = "s-1vcpu-1gb"
   tags       = ["internet_gateway"]
   monitoring = true
+  vpc_uuid   = digitalocean_vpc.vpc1.id
   user_data  = templatefile("ig_setup.yaml", {
     ssh_public_key = var.ssh_public_key,
     vpc_network_prefix = var.vpc_network_prefix1,
@@ -92,6 +93,7 @@ resource "digitalocean_droplet" "chainlink_node1" {
   size       = var.instance_size_1
   tags       = ["chainlink"]
   monitoring = true
+  vpc_uuid   = digitalocean_vpc.vpc1.id
   user_data  = templatefile("cl_setup.yaml", {
     ssh_public_key     = var.ssh_public_key,
     gateway_private_ip = digitalocean_droplet.internet_gateway1.ipv4_address_private,
