@@ -93,12 +93,13 @@ resource "digitalocean_droplet" "chainlink_node1" {
   tags       = ["chainlink"]
   monitoring = true
   user_data  = templatefile("cl_setup.yaml", {
-    ssh_public_key    = var.ssh_public_key,
-    network           = var.network,
-    cl_client_version = var.chainlink_version,
-    api_user          = var.api_user,
-    api_pw            = var.api_pw,
-    wallet_pw         = var.wallet_pw,
-    db_conn_str       = var.db_conn_str
+    ssh_public_key     = var.ssh_public_key,
+    gateway_private_ip = digitalocean_droplet.internet_gateway1.ipv4_address_private,
+    network            = var.network,
+    cl_client_version  = var.chainlink_version,
+    api_user           = var.api_user,
+    api_pw             = var.api_pw,
+    wallet_pw          = var.wallet_pw,
+    db_conn_str        = var.db_conn_str
   })
 }

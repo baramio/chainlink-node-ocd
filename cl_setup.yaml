@@ -65,6 +65,16 @@ runcmd:
   - sudo systemctl enable --now docker
   - sudo timedatectl set-ntp no
   - sudo apt update && sudo apt install ntp -y
+  - sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
+  - sudo chmod +x /usr/local/bin/yq
+  - sudo apt-get install iptables net-tools -y
+  - $gateway_ip=$(ps -ef | route -n | awk '$1 == "0.0.0.0" {print $2}')
+  - ip route add 169.254.169.254 via $gateway_ip dev eth0
+  - ip route change default via ${gateway_private_ip}
+  - yq d -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth0.routes
+  - yq w -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth1.routes[+].to 0.0.0.0/0
+  - yq w -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth1.routes[0].via ${gateway_private_ip}
+  - netplan apply -debug
   - mkdir /home/cl/.chainlink_${network}
   - echo "${api_user}" > /home/cl/.chainlink_${network}/.api
   - echo "${api_pw}" >> /home/cl/.chainlink_${network}/.api
