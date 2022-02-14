@@ -73,7 +73,7 @@ resource "digitalocean_vpc" "vpc1" {
 
 resource "digitalocean_droplet" "internet_gateway1" {
   image      = "ubuntu-20-04-x64"
-  name       = "${var.network}-${var.cl1_name}"
+  name       = "chainlink-${var.region1}-vpc-internet-gateway"
   region     = var.region1
   size       = "s-1vcpu-1gb"
   tags       = ["internet_gateway"]
