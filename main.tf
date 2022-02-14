@@ -34,7 +34,7 @@ variable "instance_size_1" {
 }
 
 variable "vpc_network_prefix1" {
-  default     = "10.03.03.0/24"
+  default     = "10.3.3.0/24"
   description = "vpc network prefix for vpc 1"
 }
 
