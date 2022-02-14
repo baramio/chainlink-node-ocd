@@ -107,6 +107,7 @@ resource "digitalocean_droplet" "chainlink_node1" {
     api_user           = var.api_user,
     api_pw             = var.api_pw,
     wallet_pw          = var.wallet_pw,
+    backup_eth_url     = var.backup_eth_url,
     db_conn_str        = var.db_conn_str
   })
 }
