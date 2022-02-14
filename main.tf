@@ -39,28 +39,33 @@ variable "vpc_network_prefix1" {
 }
 
 variable "chainlink_version" {
-  default     = ""
-  description = ""
+  default     = "1.1.0"
+  description = "chainlink node client version"
 }
 
 variable "api_user" {
   default     = ""
-  description = ""
+  description = "user creds for the chainlink node UI"
 }
 
 variable "api_pw" {
   default     = ""
-  description = ""
+  description = "user pw creds for the chainlink node UI"
 }
 
 variable "wallet_pw" {
   default     = ""
-  description = ""
+  description = "wallet pw of the chainlink node"
 }
 
 variable "db_conn_str" {
   default     = ""
-  description = ""
+  description = "postgres db connection"
+}
+
+variable "backup_eth_url" {
+  default     = ""
+  description = "backup ETH client url"
 }
 
 provider "digitalocean" {}
