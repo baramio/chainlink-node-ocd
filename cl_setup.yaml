@@ -44,8 +44,6 @@ write_files:
           stop_grace_period: 3m
           image: smartcontract/chainlink:${cl_client_version}
           container_name: chainlink
-          env-file:
-            - /chainlink.env
           volumes:
             - /home/cl/.chainlink_${network}:/chainlink
             - /etc/localtime:/etc/localtime:ro
@@ -53,7 +51,7 @@ write_files:
             - 6688:6688/tcp
           networks:
             - chainlink
-          command: chainlink local n -p /chainlink/.password -a /chainlink/.api
+          command: local n -p /chainlink/.password -a /chainlink/.api
           <<: *logging
       networks:
         chainlink:
@@ -71,7 +69,7 @@ runcmd:
   - sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
   - sudo chmod +x /usr/local/bin/yq
   - sudo apt-get install iptables net-tools -y
-  - $gateway_ip=$(ps -ef | route -n | awk '$1 == "0.0.0.0" {print $2}')
+  - gateway_ip=$(ps -ef | route -n | awk '$1 == "0.0.0.0" {print $2}')
   - ip route add 169.254.169.254 via $gateway_ip dev eth0
   - ip route change default via ${gateway_private_ip}
   - yq d -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth0.routes
@@ -79,11 +77,11 @@ runcmd:
   - yq w -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth1.routes[0].via ${gateway_private_ip}
   - netplan apply -debug
   - mkdir /home/cl/.chainlink_${network}
+  - mv /home/.env /home/cl/.chainlink_${network}/.env
+  - mv /home/docker-compose.yaml /home/cl/.chainlink_${network}/docker-compose.yaml
+  - echo "DATABASE_URL=${db_conn_str}" >> /home/cl/.chainlink_${network}/.env
   - echo "${api_user}" > /home/cl/.chainlink_${network}/.api
   - echo "${api_pw}" >> /home/cl/.chainlink_${network}/.api
   - echo "${wallet_pw}" > /home/cl/.chainlink_${network}/.password
-  - echo "DATABASE_URL=${db_conn_str}" >> /home/cl/.chainlink_${network}/.env
-  - mv /home/.env /home/cl/.chainlink_${network}/.env
-  - mv /home/docker-compose.yaml /home/cl/.chainlink_${network}/docker-compose.yaml
   - chown cl:docker -R /home/cl
-  - cd /home/cl/.chainlink_${network} && docker-compose up -d
+  - cd /home/cl/.chainlink_${network} && docker-compose --env-file .env up -d
