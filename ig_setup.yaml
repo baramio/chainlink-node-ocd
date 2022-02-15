@@ -1,0 +1,32 @@
+#cloud-config
+groups:
+  - ubuntu: [root,sys]
+  - internet_gateway
+
+# Add users to the system. Users are added after groups are added.
+users:
+  - default
+  - name: ig
+    gecos: ig
+    shell: /bin/bash
+    primary_group: internet_gateway
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+runcmd:
+  - sudo apt remove --purge --assume-yes snapd
+  - sudo apt update && sudo apt -y dist-upgrade
+  - sudo timedatectl set-ntp no
+  - sudo apt update && sudo apt install ntp -y
+  - sysctl -w net.ipv4.ip_forward=1
+  - sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
+  - sudo apt-get install iptables net-tools -y
+  - public_interface_name=$(ps -ef | route -n | awk '$1 == "0.0.0.0" {print $8}')
+  - iptables -t nat -A POSTROUTING -s ${vpc_network_prefix} -o $public_interface_name -j MASQUERADE
+  - echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+  - echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+  - sudo apt-get -y install iptables-persistent
+  - iptables-save > /etc/iptables/rules.v4

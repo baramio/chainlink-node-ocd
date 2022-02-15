@@ -1,0 +1,89 @@
+#cloud-config
+groups:
+  - ubuntu: [root,sys]
+  - docker
+
+# Add users to the system. Users are added after groups are added.
+users:
+  - default
+  - name: cl
+    gecos: cl
+    shell: /bin/bash
+    primary_group: docker
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+write_files:
+  - path: /home/.env
+    content: |
+      ROOT=/chainlink
+      LOG_LEVEL=debug
+      ETH_CHAIN_ID=4
+      CHAINLINK_TLS_PORT=0
+      SECURE_COOKIES=false
+      ALLOW_ORIGINS=*
+      ETH_URL=wss://${network}-ec-ws.baramio-nodes.com
+      ETH_HTTP_URL=https://${network}-ec-rpc.baramio-nodes.com
+      ETH_SECONDARY_URLS=${backup_eth_url}
+  - path: /home/docker-compose.yaml
+    content: |
+      version: "3.4"
+      x-logging: &logging
+        logging:
+          driver: json-file
+          options:
+            max-size: 10m
+            max-file: "3"
+      
+      services:
+        chainlink:
+          restart: unless-stopped
+          stop_grace_period: 3m
+          image: smartcontract/chainlink:${cl_client_version}
+          container_name: chainlink
+          volumes:
+            - /home/cl/.chainlink_${network}:/chainlink
+            - /etc/localtime:/etc/localtime:ro
+          ports:
+            - 6688:6688/tcp
+          networks:
+            - chainlink
+          env_file:
+            - /home/cl/.chainlink_${network}/.env
+          command: local n -p /chainlink/.password -a /chainlink/.api
+          <<: *logging
+      networks:
+        chainlink:
+          driver: bridge
+          driver_opts:
+            com.docker.network.enable_ipv4: "true"
+
+runcmd:
+  - sudo apt remove --purge --assume-yes snapd
+  - sudo apt update && sudo apt -y dist-upgrade
+  - sudo apt install -y docker-compose
+  - sudo systemctl enable --now docker
+  - sudo timedatectl set-ntp no
+  - sudo apt update && sudo apt install ntp -y
+  - sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
+  - sudo chmod +x /usr/local/bin/yq
+  - sudo apt-get install iptables net-tools -y
+  - gateway_ip=$(ps -ef | route -n | awk '$1 == "0.0.0.0" {print $2}')
+  - ip route add 169.254.169.254 via $gateway_ip dev eth0
+  - ip route change default via ${gateway_private_ip}
+  - yq d -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth0.routes
+  - yq w -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth1.routes[+].to 0.0.0.0/0
+  - yq w -i /etc/netplan/50-cloud-init.yaml network.ethernets.eth1.routes[0].via ${gateway_private_ip}
+  - netplan apply -debug
+  - mkdir /home/cl/.chainlink_${network}
+  - mv /home/.env /home/cl/.chainlink_${network}/.env
+  - mv /home/docker-compose.yaml /home/cl/.chainlink_${network}/docker-compose.yaml
+  - echo "DATABASE_URL=${db_conn_str}" >> /home/cl/.chainlink_${network}/.env
+  - echo "${api_user}" > /home/cl/.chainlink_${network}/.api
+  - echo "${api_pw}" >> /home/cl/.chainlink_${network}/.api
+  - echo "${wallet_pw}" > /home/cl/.chainlink_${network}/.password
+  - chown cl:docker -R /home/cl
+  - cd /home/cl/.chainlink_${network} && docker-compose up -d
