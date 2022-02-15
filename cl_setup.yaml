@@ -51,6 +51,8 @@ write_files:
             - 6688:6688/tcp
           networks:
             - chainlink
+          env_file:
+            - /home/cl/.chainlink_${network}/.env
           command: local n -p /chainlink/.password -a /chainlink/.api
           <<: *logging
       networks:
@@ -84,4 +86,4 @@ runcmd:
   - echo "${api_pw}" >> /home/cl/.chainlink_${network}/.api
   - echo "${wallet_pw}" > /home/cl/.chainlink_${network}/.password
   - chown cl:docker -R /home/cl
-  - cd /home/cl/.chainlink_${network} && docker-compose --env-file .env up -d
+  - cd /home/cl/.chainlink_${network} && docker-compose up -d
