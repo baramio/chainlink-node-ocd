@@ -54,7 +54,6 @@ resource "kubernetes_config_map" "chainlink-env" {
     name      = "chainlink-env"
     namespace = "chainlink"
   }
-
   data = {
     ROOT = "/chainlink"
     LOG_LEVEL = "debug"
@@ -67,31 +66,34 @@ resource "kubernetes_config_map" "chainlink-env" {
     ETH_SECONDARY_URLS = var.backup_eth_url
     DATABASE_URL = var.database_url
 #    MIN_OUTGOING_CONFIRMATIONS = 2
-#    LINK_CONTRACT_ADDRESS = "0x20fe562d797a42dcb3399062ae9546cd06f63280"
+#    LINK_CONTRACT_ADDRESS = ""
 #    CHAINLINK_TLS_PORT = 0
-#    ORACLE_CONTRACT_ADDRESS = "0x9f37f5f695cc16bebb1b227502809ad0fb117e08"
+#    ORACLE_CONTRACT_ADDRESS = ""
 #    MINIMUM_CONTRACT_PAYMENT = 100
 #    DATABASE_TIMEOUT = 0
   }
 }
 
-resource "kubernetes_secret" "api-credentials" {
+resource "kubernetes_secret" "chainlink-api-creds" {
   metadata {
-    name      = "api-credentials"
+    name      = "chainlink-api-creds"
     namespace = "chainlink"
   }
   data = {
-    api = format("%s\n%s",var.api_user, var.api_pw)
+    ".api" = <<EOF
+${var.api_user}
+${var.api_pw}
+    EOF
   }
 }
 
-resource "kubernetes_secret" "password-credentials" {
+resource "kubernetes_secret" "chainlink-pw-creds" {
   metadata {
-    name      = "password-credentials"
+    name      = "chainlink-pw-creds"
     namespace = "chainlink"
   }
   data = {
-    password = var.wallet_pw
+    ".password" = var.wallet_pw
   }
 }
 
@@ -131,25 +133,25 @@ resource "kubernetes_deployment" "chainlink-node" {
           }
           volume_mount {
             name        = "api-volume"
-            sub_path    = "api"
-            mount_path  = "/chainlink/.api"
+            mount_path  = "/chainlink"
+            read_only  = true
           }
           volume_mount {
             name        = "password-volume"
-            sub_path    = "password"
-            mount_path  = "/chainlink/.password"
+            mount_path  = "/chainlink"
+            read_only  = true
           }
         }
         volume {
           name = "api-volume"
           secret {
-            secret_name = "api-credentials"
+            secret_name = "chainlink-api-creds"
           }
         }
         volume {
           name = "password-volume"
           secret {
-            secret_name = "password-credentials"
+            secret_name = "chainlink-pw-creds"
           }
         }
       }
@@ -194,9 +196,9 @@ resource "cloudflare_record" "cl_record" {
   proxied = true
 }
 
-resource "kubernetes_secret" "cloudflared_creds" {
+resource "kubernetes_secret" "cloudflared-creds" {
   metadata {
-    name      = "cloudflared_creds"
+    name      = "cloudflared-creds"
     namespace = "chainlink"
   }
   data = {
@@ -211,9 +213,9 @@ resource "kubernetes_secret" "cloudflared_creds" {
   }
 }
 
-resource "kubernetes_config_map" "cloudflared_config" {
+resource "kubernetes_config_map" "cloudflared-config" {
   metadata {
-    name      = "cloudflared_config"
+    name      = "cloudflared-config"
     namespace = "chainlink"
   }
   data = {
@@ -231,7 +233,6 @@ ingress:
   - service: http_status:404
     EOF
   }
-
 }
 
 resource "kubernetes_deployment" "cloudflared" {
@@ -261,12 +262,12 @@ resource "kubernetes_deployment" "cloudflared" {
           name  = "cloudflared"
           args  = ["tunnel", "--config", "/etc/cloudflared/config.yaml",  "run"]
           volume_mount {
-            name       = "cloudflared_config"
+            name       = "cloudflared-config"
             mount_path = "/etc/cloudflared"
             read_only  = true
           }
           volume_mount {
-            name       = "cloudflared_creds"
+            name       = "cloudflared-creds"
             mount_path = "/etc/cloudflared/creds"
             read_only  = true
           }
@@ -278,19 +279,18 @@ resource "kubernetes_deployment" "cloudflared" {
             failure_threshold     = 1
             initial_delay_seconds = 10
             period_seconds        = 10
-
           }
         }
         volume {
-          name = "cloudflared_creds"
+          name = "cloudflared-creds"
           secret {
-            secret_name = "cloudflared_creds"
+            secret_name = "cloudflared-creds"
           }
         }
         volume {
-          name = "cloudflared_config"
+          name = "cloudflared-config"
           config_map {
-            name = "cloudflared_config"
+            name = "cloudflared-config"
           }
         }
       }
