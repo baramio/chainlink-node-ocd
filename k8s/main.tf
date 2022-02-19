@@ -19,17 +19,27 @@ terraform {
 }
 
 variable "network" {}
-variable "backup_eth_url" {}
+variable "backup_eth_url" {
+  sensitive = true
+}
 variable "api_user" {}
-variable "api_pw" {}
-variable "wallet_pw" {}
-variable "database_url" {}
+variable "api_pw" {
+  sensitive = true
+}
+variable "wallet_pw" {
+  sensitive = true
+}
+variable "database_url" {
+  sensitive = true
+}
 variable "chainlink_version" {
   default     = "1.1.0"
   description = "chainlink node client version"
 }
 variable "cf_email" {}
-variable "cf_tunnel_token" {}
+variable "cf_tunnel_token" {
+  sensitive = true
+}
 variable "cf_acctid" {}
 variable "cf_zoneid" {}
 
@@ -63,14 +73,32 @@ resource "kubernetes_config_map" "chainlink-env" {
     ALLOW_ORIGINS = "*"
     ETH_URL = "wss://${var.network}-ec-ws.baramio-nodes.com"
     ETH_HTTP_URL = "https://${var.network}-ec-rpc.baramio-nodes.com"
-    ETH_SECONDARY_URLS = var.backup_eth_url
-    DATABASE_URL = var.database_url
 #    MIN_OUTGOING_CONFIRMATIONS = 2
 #    LINK_CONTRACT_ADDRESS = ""
 #    CHAINLINK_TLS_PORT = 0
 #    ORACLE_CONTRACT_ADDRESS = ""
 #    MINIMUM_CONTRACT_PAYMENT = 100
 #    DATABASE_TIMEOUT = 0
+  }
+}
+
+resource "kubernetes_secret" "chainlink-db-url" {
+  metadata {
+    name      = "chainlink-db-url"
+    namespace = "chainlink"
+  }
+  data = {
+    "db-url" = var.database_url
+  }
+}
+
+resource "kubernetes_secret" "chainlink-eth-backup-url" {
+  metadata {
+    name      = "chainlink-eth-backup-url"
+    namespace = "chainlink"
+  }
+  data = {
+    "eth-backup-url" = var.backup_eth_url
   }
 }
 
@@ -125,20 +153,38 @@ resource "kubernetes_deployment" "chainlink-node" {
           port {
             container_port = 6688
           }
-          args = ["local", "n", "-p",  "/chainlink/.password", "-a", "/chainlink/.api"]
+          args = ["local", "n", "-p",  "/chainlink/pw/.password", "-a", "/chainlink/api/.api"]
           env_from {
             config_map_ref {
               name = "chainlink-env"
             }
           }
+          env {
+            name = "DATABASE_URL"
+            value_from {
+              secret_key_ref {
+                name = "chainlink-db-url"
+                key = "db-url"
+              }
+            }
+          }
+          env {
+            name = "ETH_SECONDARY_URLS"
+            value_from {
+              secret_key_ref {
+                name = "chainlink-eth-backup-url"
+                key = "eth-backup-url"
+              }
+            }
+          }
           volume_mount {
             name        = "api-volume"
-            mount_path  = "/chainlink"
+            mount_path  = "/chainlink/api"
             read_only  = true
           }
           volume_mount {
             name        = "password-volume"
-            mount_path  = "/chainlink"
+            mount_path  = "/chainlink/pw"
             read_only  = true
           }
         }
@@ -177,11 +223,10 @@ resource "kubernetes_service" "chainlink_service" {
 
 # setup HTTPS connection to the API/GUI using Cloudflare Tunnel and exposing it to a specified baramio-nodes domain
 # https://github.com/cloudflare/argo-tunnel-examples/blob/master/named-tunnel-k8s/cloudflared.yaml
-# The random_id resource is used to generate a 35 character secret for the tunnel
 resource "random_id" "tunnel_secret" {
   byte_length = 35
 }
-# A Named Tunnel resource called cl_tunnel
+
 resource "cloudflare_argo_tunnel" "cl_tunnel" {
   account_id = var.cf_acctid
   name       = "chainlink-${var.network}-tunnel"
