@@ -125,7 +125,7 @@ resource "kubernetes_secret" "chainlink-pw-creds" {
   }
 }
 
-resource "kubernetes_deployment" "chainlink-node" {
+resource "kubernetes_stateful_set" "chainlink-node" {
   metadata {
     name = "chainlink"
     namespace = "chainlink"
@@ -202,6 +202,7 @@ resource "kubernetes_deployment" "chainlink-node" {
         }
       }
     }
+    service_name = "chainlink-node"
   }
 }
 
@@ -209,12 +210,15 @@ resource "kubernetes_service" "chainlink_service" {
   metadata {
     name = "chainlink-node"
     namespace = "chainlink"
+    labels = {
+      app = "chainlink-node"
+    }
   }
   spec {
     selector = {
       app = "chainlink-node"
     }
-    type = "NodePort"
+    cluster_ip = "None"
     port {
       port = 6688
     }
