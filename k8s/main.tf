@@ -73,12 +73,10 @@ resource "kubernetes_config_map" "chainlink-env" {
     ALLOW_ORIGINS = "*"
     ETH_URL = "wss://${var.network}-ec-ws.baramio-nodes.com"
     ETH_HTTP_URL = "https://${var.network}-ec-rpc.baramio-nodes.com"
+    FEATURE_WEBHOOK_V2 = true
+    ORACLE_CONTRACT_ADDRESS = "0x60b282ab5E60cC114014372795E4a5F9727a426D"
 #    MIN_OUTGOING_CONFIRMATIONS = 2
-#    LINK_CONTRACT_ADDRESS = ""
-#    CHAINLINK_TLS_PORT = 0
-#    ORACLE_CONTRACT_ADDRESS = ""
-#    MINIMUM_CONTRACT_PAYMENT = 100
-#    DATABASE_TIMEOUT = 0
+#    MINIMUM_CONTRACT_PAYMENT_LINK_JUELS = 100
   }
 }
 
