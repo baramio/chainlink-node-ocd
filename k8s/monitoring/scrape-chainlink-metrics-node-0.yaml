@@ -16,3 +16,5 @@ spec:
   - targetPort: 6688
     path: /metrics
     interval: 15s
+  podTargetLabels:
+    - chainlink
