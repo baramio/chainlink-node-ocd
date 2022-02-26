@@ -16,14 +16,15 @@ provider "random" {}
 
 # setup HTTPS connection to the API/GUI using Cloudflare Tunnel and exposing it to a specified baramio-nodes domain
 # https://github.com/cloudflare/argo-tunnel-examples/blob/master/named-tunnel-k8s/cloudflared.yaml
-resource "random_id" "cl_tunnel_secret" {
+resource "random_id" "cl_node_tunnel_secret" {
   byte_length = 35
 }
 
 resource "cloudflare_argo_tunnel" "cl_tunnel" {
   account_id = var.cf_acctid
   name       = "chainlink-${var.network}-tunnel"
-  secret     = random_id.cl_tunnel_secret.b64_std
+  secret     = random_id.cl_node_tunnel_secret.b64_std
+  depends_on = [random_id.cl_node_tunnel_secret]
 }
 
 resource "cloudflare_record" "cl_record" {
@@ -32,6 +33,7 @@ resource "cloudflare_record" "cl_record" {
   value   = "${cloudflare_argo_tunnel.cl_tunnel.id}.cfargotunnel.com"
   type    = "CNAME"
   proxied = true
+  depends_on = [cloudflare_argo_tunnel.cl_tunnel]
 }
 
 resource "kubernetes_secret" "cl-cloudflared-creds" {
@@ -45,10 +47,11 @@ resource "kubernetes_secret" "cl-cloudflared-creds" {
     "AccountTag"   : "${var.cf_acctid}",
     "TunnelID"     : "${cloudflare_argo_tunnel.cl_tunnel.id}",
     "TunnelName"   : "${cloudflare_argo_tunnel.cl_tunnel.name}",
-    "TunnelSecret" : "${random_id.cl_tunnel_secret.b64_std}"
+    "TunnelSecret" : "${random_id.cl_node_tunnel_secret.b64_std}"
 }
     EOF
   }
+  depends_on = [kubernetes_namespace.chainlink, cloudflare_argo_tunnel.cl_tunnel]
 }
 
 resource "kubernetes_config_map" "cl-cloudflared-config" {
@@ -71,6 +74,7 @@ ingress:
   - service: http_status:404
     EOF
   }
+  depends_on = [kubernetes_namespace.chainlink, cloudflare_argo_tunnel.cl_tunnel]
 }
 
 resource "kubernetes_deployment" "cl-cloudflared" {
@@ -134,16 +138,18 @@ resource "kubernetes_deployment" "cl-cloudflared" {
       }
     }
   }
+  depends_on = [kubernetes_config_map.cl-cloudflared-config, kubernetes_secret.cl-cloudflared-creds]
 }
 
-resource "random_id" "prometheus_tunnel_secret" {
+resource "random_id" "cl_monitoring_tunnel_secret" {
   byte_length = 35
 }
 
 resource "cloudflare_argo_tunnel" "prometheus_tunnel" {
   account_id = var.cf_acctid
   name       = "chainlink-${var.network}-prometheus-tunnel"
-  secret     = random_id.prometheus_tunnel_secret.b64_std
+  secret     = random_id.cl_monitoring_tunnel_secret.b64_std
+  depends_on = [random_id.cl_monitoring_tunnel_secret]
 }
 
 resource "cloudflare_record" "grafana_record" {
@@ -152,6 +158,7 @@ resource "cloudflare_record" "grafana_record" {
   value   = "${cloudflare_argo_tunnel.prometheus_tunnel.id}.cfargotunnel.com"
   type    = "CNAME"
   proxied = true
+  depends_on = [cloudflare_argo_tunnel.prometheus_tunnel]
 }
 
 resource "cloudflare_record" "prometheus_record" {
@@ -160,6 +167,7 @@ resource "cloudflare_record" "prometheus_record" {
   value   = "${cloudflare_argo_tunnel.prometheus_tunnel.id}.cfargotunnel.com"
   type    = "CNAME"
   proxied = true
+  depends_on = [cloudflare_argo_tunnel.prometheus_tunnel]
 }
 
 resource "kubernetes_secret" "prometheus-cloudflared-creds" {
@@ -173,10 +181,11 @@ resource "kubernetes_secret" "prometheus-cloudflared-creds" {
     "AccountTag"   : "${var.cf_acctid}",
     "TunnelID"     : "${cloudflare_argo_tunnel.prometheus_tunnel.id}",
     "TunnelName"   : "${cloudflare_argo_tunnel.prometheus_tunnel.name}",
-    "TunnelSecret" : "${random_id.prometheus_tunnel_secret.b64_std}"
+    "TunnelSecret" : "${random_id.cl_monitoring_tunnel_secret.b64_std}"
 }
     EOF
   }
+  depends_on = [kubernetes_namespace.chainlink, cloudflare_argo_tunnel.prometheus_tunnel]
 }
 
 resource "kubernetes_config_map" "monitoring-cloudflared-config" {
@@ -202,6 +211,7 @@ ingress:
   - service: http_status:404
     EOF
   }
+  depends_on = [kubernetes_namespace.chainlink, cloudflare_argo_tunnel.prometheus_tunnel]
 }
 
 resource "kubernetes_deployment" "monitoring-cloudflared" {
@@ -265,4 +275,5 @@ resource "kubernetes_deployment" "monitoring-cloudflared" {
       }
     }
   }
+  depends_on = [kubernetes_config_map.monitoring-cloudflared-config, kubernetes_secret.prometheus-cloudflared-creds]
 }

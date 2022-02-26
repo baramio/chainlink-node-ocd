@@ -33,7 +33,7 @@ variable "database_url" {
   sensitive = true
 }
 variable "chainlink_version" {
-  default     = "1.1.0"
+  default     = "1.1.1"
   description = "chainlink node client version"
 }
 
