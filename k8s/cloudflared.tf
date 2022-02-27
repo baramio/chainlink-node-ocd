@@ -67,9 +67,9 @@ metrics: 0.0.0.0:2000
 no-autoupdate: true
 
 ingress:
-  # route API/GUI requests to 6688
+  # route API/GUI requests to 6689
   - hostname: "chainlink-${var.network}.baramio-nodes.com"
-    service: http://chainlink-node:6688
+    service: https://chainlink-node:6689
   # everything else is invalid
   - service: http_status:404
     EOF

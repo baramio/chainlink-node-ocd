@@ -56,16 +56,20 @@ resource "kubernetes_config_map" "chainlink-env" {
     ROOT = "/chainlink"
     LOG_LEVEL = "debug"
     ETH_CHAIN_ID = 4
-    CHAINLINK_TLS_PORT = 0
-    SECURE_COOKIES = false
+    TLS_CERT_PATH = "/chainlink/tls/server.crt"
+    TLS_KEY_PATH = "/chainlink/tls/server.key"
     ALLOW_ORIGINS = "*"
     ETH_URL = "wss://${var.network}-ec-ws.baramio-nodes.com"
     ETH_HTTP_URL = "https://${var.network}-ec-rpc.baramio-nodes.com"
     FEATURE_WEBHOOK_V2 = true
     ORACLE_CONTRACT_ADDRESS = "0x60b282ab5E60cC114014372795E4a5F9727a426D"
-#    MIN_OUTGOING_CONFIRMATIONS = 2
-#    MINIMUM_CONTRACT_PAYMENT_LINK_JUELS = 100
+    FEATURE_OFFCHAIN_REPORTING = true
+    OCR_TRACE_LOGGING = true
+    P2P_LISTEN_PORT = 9333
+    P2P_ANNOUNCE_IP = kubernetes_service.chainlink_service_expose.status.0.load_balancer.0.ingress.0.ip
+    P2P_ANNOUNCE_PORT = 9333
   }
+  depends_on = [kubernetes_service.chainlink_service_expose]
 }
 
 resource "kubernetes_secret" "chainlink-db-url" {
@@ -133,11 +137,26 @@ resource "kubernetes_stateful_set" "chainlink-node" {
         }
       }
       spec {
+        init_container {
+          name = "init-chainlink-node"
+          image = "smartcontract/chainlink:${var.chainlink_version}"
+          command = ["bash", "-c", <<EOF
+openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey rsa:2048 -nodes -sha256 -days 365 -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
+            EOF
+          ]
+          volume_mount {
+            mount_path = "/mnt/tls"
+            name       = "tls"
+          }
+        }
         container {
           image = "smartcontract/chainlink:${var.chainlink_version}"
           name  = "chainlink-node"
           port {
-            container_port = 6688
+            container_port = 6689
+          }
+          port {
+            container_port = 9333
           }
           args = ["local", "n", "-p",  "/chainlink/pw/.password", "-a", "/chainlink/api/.api"]
           env_from {
@@ -173,6 +192,11 @@ resource "kubernetes_stateful_set" "chainlink-node" {
             mount_path  = "/chainlink/pw"
             read_only  = true
           }
+          volume_mount {
+            mount_path = "/chainlink/tls"
+            name       = "tls"
+            read_only = true
+          }
         }
         volume {
           name = "api-volume"
@@ -186,10 +210,15 @@ resource "kubernetes_stateful_set" "chainlink-node" {
             secret_name = "chainlink-pw-creds"
           }
         }
+        volume {
+          name = "tls"
+          empty_dir {}
+        }
       }
     }
     service_name = "chainlink-node"
   }
+  depends_on = [kubernetes_config_map.chainlink-env]
 }
 
 resource "kubernetes_service" "chainlink_service" {
@@ -206,8 +235,31 @@ resource "kubernetes_service" "chainlink_service" {
     }
     cluster_ip = "None"
     port {
-      port = 6688
+      port = 6689
     }
   }
 }
 
+resource "kubernetes_service" "chainlink_service_expose" {
+  metadata {
+    name = "chainlink-node-expose"
+    namespace = "chainlink"
+    labels = {
+      app = "chainlink-node"
+    }
+  }
+  spec {
+    selector = {
+      app = "chainlink-node"
+    }
+    external_traffic_policy = "Local"
+    type = "LoadBalancer"
+    port {
+      port = "9333"
+      protocol = "TCP"
+      target_port = "9333"
+      name = "p2p"
+    }
+  }
+  wait_for_load_balancer = true
+}
