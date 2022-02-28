@@ -77,6 +77,7 @@ resource "kubernetes_config_map" "chainlink-env" {
     OCR_KEY_BUNDLE_ID = var.OCR_KEY_BUNDLE_ID
     P2P_PEER_ID = var.P2P_PEER_ID
     OCR_TRANSMITTER_ADDRESS = var.OCR_TRANSMITTER_ADDRESS
+    DATABASE_LOCKING_MODE = "dual"
   }
   depends_on = [kubernetes_service.chainlink_service_expose]
 }
