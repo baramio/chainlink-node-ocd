@@ -36,6 +36,10 @@ variable "chainlink_version" {
   default     = "1.1.1"
   description = "chainlink node client version"
 }
+variable "ORACLE_CONTRACT_ADDRESS" {}
+variable "OCR_KEY_BUNDLE_ID" {}
+variable "P2P_PEER_ID" {}
+variable "OCR_TRANSMITTER_ADDRESS" {}
 
 provider "kubernetes" {
   config_path    = "baramio-kubeconfig.yaml"
@@ -62,12 +66,17 @@ resource "kubernetes_config_map" "chainlink-env" {
     ETH_URL = "wss://${var.network}-ec-ws.baramio-nodes.com"
     ETH_HTTP_URL = "https://${var.network}-ec-rpc.baramio-nodes.com"
     FEATURE_WEBHOOK_V2 = true
-    ORACLE_CONTRACT_ADDRESS = "0x60b282ab5E60cC114014372795E4a5F9727a426D"
+    ORACLE_CONTRACT_ADDRESS = var.ORACLE_CONTRACT_ADDRESS
     FEATURE_OFFCHAIN_REPORTING = true
     OCR_TRACE_LOGGING = true
     P2P_LISTEN_PORT = 9333
     P2P_ANNOUNCE_IP = kubernetes_service.chainlink_service_expose.status.0.load_balancer.0.ingress.0.ip
     P2P_ANNOUNCE_PORT = 9333
+    JSON_CONSOLE = true
+    LOG_TO_DISK = false
+    OCR_KEY_BUNDLE_ID = var.OCR_KEY_BUNDLE_ID
+    P2P_PEER_ID = var.P2P_PEER_ID
+    OCR_TRANSMITTER_ADDRESS = var.OCR_TRANSMITTER_ADDRESS
   }
   depends_on = [kubernetes_service.chainlink_service_expose]
 }
@@ -152,6 +161,9 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
         container {
           image = "smartcontract/chainlink:${var.chainlink_version}"
           name  = "chainlink-node"
+          port {
+            container_port = 6688
+          }
           port {
             container_port = 6689
           }
