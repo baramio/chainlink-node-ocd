@@ -40,6 +40,10 @@ variable "ORACLE_CONTRACT_ADDRESS" {}
 variable "OCR_KEY_BUNDLE_ID" {}
 variable "P2P_PEER_ID" {}
 variable "OCR_TRANSMITTER_ADDRESS" {}
+variable "EXPLORER_ACCESS_KEY" {}
+variable "EXPLORER_SECRET" {}
+variable "EXPLORER_URL" {}
+variable "P2P_BOOTSTRAP_PEERS" {}
 
 provider "kubernetes" {
   config_path    = "baramio-kubeconfig.yaml"
@@ -78,6 +82,10 @@ resource "kubernetes_config_map" "chainlink-env" {
     P2P_PEER_ID = var.P2P_PEER_ID
     OCR_TRANSMITTER_ADDRESS = var.OCR_TRANSMITTER_ADDRESS
     DATABASE_LOCKING_MODE = "dual"
+    EXPLORER_ACCESS_KEY = var.EXPLORER_ACCESS_KEY
+    EXPLORER_SECRET = var.EXPLORER_SECRET
+    EXPLORER_URL = var.EXPLORER_URL
+    P2P_BOOTSTRAP_PEERS = var.P2P_BOOTSTRAP_PEERS
   }
   depends_on = [kubernetes_service.chainlink_service_expose]
 }
