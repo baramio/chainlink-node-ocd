@@ -1,2 +1,3 @@
 k8s/baramio-kubeconfig.yaml
 k8s/terraform.tfvars
+k8s/misc/*
