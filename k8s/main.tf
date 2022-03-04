@@ -32,10 +32,7 @@ variable "wallet_pw" {
 variable "database_url" {
   sensitive = true
 }
-variable "chainlink_version" {
-  default     = "1.1.1"
-  description = "chainlink node client version"
-}
+variable "chainlink_version" {}
 variable "ORACLE_CONTRACT_ADDRESS" {}
 variable "OCR_KEY_BUNDLE_ID" {}
 variable "P2P_PEER_ID" {}

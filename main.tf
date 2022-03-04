@@ -28,10 +28,7 @@ variable "cl2_name" {
   default     = "boreas"
   description = "name of the first node"
 }
-variable "chainlink_version" {
-  default     = "1.1.0"
-  description = "chainlink node client version"
-}
+variable "chainlink_version" {}
 
 provider "digitalocean" {}
 
