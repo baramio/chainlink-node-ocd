@@ -1,11 +1,4 @@
 terraform {
-  cloud {
-    organization = "BARAMIO"
-
-    workspaces {
-      name = "chainlink-node-ocd--k8s"
-    }
-  }
   required_providers {
     cloudflare = {
       source = "cloudflare/cloudflare"
@@ -19,9 +12,6 @@ terraform {
 }
 
 variable "network" {}
-variable "backup_eth_url" {
-  sensitive = true
-}
 variable "api_user" {}
 variable "api_pw" {
   sensitive = true
@@ -46,32 +36,32 @@ provider "kubernetes" {
   config_path    = "baramio-kubeconfig.yaml"
 }
 
-resource "kubernetes_namespace" "chainlink" {
+resource "kubernetes_namespace" "chainlink-polygon" {
   metadata {
-    name = "chainlink"
+    name = "chainlink-polygon"
   }
 }
 
-resource "kubernetes_config_map" "chainlink-env" {
+resource "kubernetes_config_map" "chainlink-polygon-env" {
   metadata {
-    name      = "chainlink-env"
-    namespace = "chainlink"
+    name      = "chainlink-polygon-env"
+    namespace = "chainlink-polygon"
   }
   data = {
     ROOT = "/chainlink"
     LOG_LEVEL = "debug"
-    ETH_CHAIN_ID = 4
+    ETH_CHAIN_ID = 80001
     TLS_CERT_PATH = "/chainlink/tls/server.crt"
     TLS_KEY_PATH = "/chainlink/tls/server.key"
     ALLOW_ORIGINS = "*"
-    ETH_URL = "wss://${var.network}-ec-ws.baramio-nodes.com"
-    ETH_HTTP_URL = "https://${var.network}-ec-rpc.baramio-nodes.com"
+    ETH_URL = "wss://polygon2-${var.network}-ws.baramio-nodes.com"
+    ETH_HTTP_URL = "https://polygon2-${var.network}-rpc.baramio-nodes.com"
     FEATURE_WEBHOOK_V2 = true
     ORACLE_CONTRACT_ADDRESS = var.ORACLE_CONTRACT_ADDRESS
     FEATURE_OFFCHAIN_REPORTING = true
     OCR_TRACE_LOGGING = true
     P2P_LISTEN_PORT = 9333
-    P2P_ANNOUNCE_IP = kubernetes_service.chainlink_service_expose.status.0.load_balancer.0.ingress.0.ip
+    P2P_ANNOUNCE_IP = kubernetes_service.chainlink-polygon_service_expose.status.0.load_balancer.0.ingress.0.ip
     P2P_ANNOUNCE_PORT = 9333
     JSON_CONSOLE = true
     LOG_TO_DISK = false
@@ -84,33 +74,23 @@ resource "kubernetes_config_map" "chainlink-env" {
     EXPLORER_URL = var.EXPLORER_URL
     P2P_BOOTSTRAP_PEERS = var.P2P_BOOTSTRAP_PEERS
   }
-  depends_on = [kubernetes_service.chainlink_service_expose]
+  depends_on = [kubernetes_service.chainlink-polygon_service_expose]
 }
 
-resource "kubernetes_secret" "chainlink-db-url" {
+resource "kubernetes_secret" "chainlink-polygon-db-url" {
   metadata {
-    name      = "chainlink-db-url"
-    namespace = "chainlink"
+    name      = "chainlink-polygon-db-url"
+    namespace = "chainlink-polygon"
   }
   data = {
     "db-url" = var.database_url
   }
 }
 
-resource "kubernetes_secret" "chainlink-eth-backup-url" {
+resource "kubernetes_secret" "chainlink-polygon-api-creds" {
   metadata {
-    name      = "chainlink-eth-backup-url"
-    namespace = "chainlink"
-  }
-  data = {
-    "eth-backup-url" = var.backup_eth_url
-  }
-}
-
-resource "kubernetes_secret" "chainlink-api-creds" {
-  metadata {
-    name      = "chainlink-api-creds"
-    namespace = "chainlink"
+    name      = "chainlink-polygon-api-creds"
+    namespace = "chainlink-polygon"
   }
   data = {
     ".api" = <<EOF
@@ -120,40 +100,40 @@ ${var.api_pw}
   }
 }
 
-resource "kubernetes_secret" "chainlink-pw-creds" {
+resource "kubernetes_secret" "chainlink-polygon-pw-creds" {
   metadata {
-    name      = "chainlink-pw-creds"
-    namespace = "chainlink"
+    name      = "chainlink-polygon-pw-creds"
+    namespace = "chainlink-polygon"
   }
   data = {
     ".password" = var.wallet_pw
   }
 }
 
-resource "kubernetes_stateful_set" "chainlink-node" {
+resource "kubernetes_stateful_set" "chainlink-polygon-node" {
   metadata {
-    name = "chainlink"
-    namespace = "chainlink"
+    name = "chainlink-polygon"
+    namespace = "chainlink-polygon"
     labels = {
-      app = "chainlink-node"
+      app = "chainlink-polygon-node"
     }
   }
   spec {
     replicas = 2
     selector {
       match_labels = {
-        app = "chainlink-node"
+        app = "chainlink-polygon-node"
       }
     }
     template {
       metadata {
         labels = {
-          app = "chainlink-node"
+          app = "chainlink-polygon-node"
         }
       }
       spec {
         init_container {
-          name = "init-chainlink-node"
+          name = "init-chainlink-polygon-node"
           image = "smartcontract/chainlink:${var.chainlink_version}"
           command = ["bash", "-c", <<EOF
 openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey rsa:2048 -nodes -sha256 -days 365 -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
@@ -166,7 +146,7 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
         }
         container {
           image = "smartcontract/chainlink:${var.chainlink_version}"
-          name  = "chainlink-node"
+          name  = "chainlink-polygon-node"
           port {
             container_port = 6688
           }
@@ -179,24 +159,15 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
           args = ["local", "n", "-p",  "/chainlink/pw/.password", "-a", "/chainlink/api/.api"]
           env_from {
             config_map_ref {
-              name = "chainlink-env"
+              name = "chainlink-polygon-env"
             }
           }
           env {
             name = "DATABASE_URL"
             value_from {
               secret_key_ref {
-                name = "chainlink-db-url"
+                name = "chainlink-polygon-db-url"
                 key = "db-url"
-              }
-            }
-          }
-          env {
-            name = "ETH_SECONDARY_URLS"
-            value_from {
-              secret_key_ref {
-                name = "chainlink-eth-backup-url"
-                key = "eth-backup-url"
               }
             }
           }
@@ -219,13 +190,13 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
         volume {
           name = "api-volume"
           secret {
-            secret_name = "chainlink-api-creds"
+            secret_name = "chainlink-polygon-api-creds"
           }
         }
         volume {
           name = "password-volume"
           secret {
-            secret_name = "chainlink-pw-creds"
+            secret_name = "chainlink-polygon-pw-creds"
           }
         }
         volume {
@@ -234,22 +205,22 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
         }
       }
     }
-    service_name = "chainlink-node"
+    service_name = "chainlink-polygon-node"
   }
-  depends_on = [kubernetes_config_map.chainlink-env]
+  depends_on = [kubernetes_config_map.chainlink-polygon-env]
 }
 
-resource "kubernetes_service" "chainlink_service" {
+resource "kubernetes_service" "chainlink-polygon_service" {
   metadata {
-    name = "chainlink-node"
-    namespace = "chainlink"
+    name = "chainlink-polygon-node"
+    namespace = "chainlink-polygon"
     labels = {
-      app = "chainlink-node"
+      app = "chainlink-polygon-node"
     }
   }
   spec {
     selector = {
-      app = "chainlink-node"
+      app = "chainlink-polygon-node"
     }
     cluster_ip = "None"
     port {
@@ -258,17 +229,17 @@ resource "kubernetes_service" "chainlink_service" {
   }
 }
 
-resource "kubernetes_service" "chainlink_service_expose" {
+resource "kubernetes_service" "chainlink-polygon_service_expose" {
   metadata {
-    name = "chainlink-node-expose"
-    namespace = "chainlink"
+    name = "chainlink-polygon-node-expose"
+    namespace = "chainlink-polygon"
     labels = {
-      app = "chainlink-node"
+      app = "chainlink-polygon-node"
     }
   }
   spec {
     selector = {
-      app = "chainlink-node"
+      app = "chainlink-polygon-node"
     }
     external_traffic_policy = "Local"
     type = "LoadBalancer"

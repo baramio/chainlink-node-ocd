@@ -1,20 +1,20 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: chainlink-metrics-servicemonitor-0
+  name: chainlink-polygon-metrics-servicemonitor-0
   namespace: kube-prometheus-stack
   labels:
     release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
-      statefulset.kubernetes.io/pod-name: chainlink-0
+      statefulset.kubernetes.io/pod-name: chainlink-polygon-0
   namespaceSelector:
     matchNames:
-      - chainlink
+      - chainlink-polygon
   podMetricsEndpoints:
   - targetPort: 6688
     path: /metrics
     interval: 15s
   podTargetLabels:
-    - chainlink
+    - chainlink-polygon
