@@ -154,7 +154,7 @@ resource "kubernetes_stateful_set" "chainlink-node" {
       spec {
         init_container {
           name = "init-chainlink-node"
-          image = "smartcontract/chainlink:${var.chainlink_version}"
+          image = "dextrac/chainlink-olympics:${var.chainlink_version}"
           command = ["bash", "-c", <<EOF
 openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey rsa:2048 -nodes -sha256 -days 365 -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
             EOF
@@ -165,7 +165,7 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
           }
         }
         container {
-          image = "smartcontract/chainlink:${var.chainlink_version}"
+          image = "dextrac/chainlink-olympics:${var.chainlink_version}"
           name  = "chainlink-node"
           port {
             container_port = 6688
