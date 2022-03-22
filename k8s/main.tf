@@ -75,6 +75,8 @@ resource "kubernetes_config_map" "chainlink-env" {
     P2P_ANNOUNCE_PORT = 9333
     JSON_CONSOLE = true
     LOG_TO_DISK = false
+    EVM_EIP1559_DYNAMIC_FEES = true
+    GAS_ESTIMATOR_MODE = "BlockHistory"
     OCR_KEY_BUNDLE_ID = var.OCR_KEY_BUNDLE_ID
     P2P_PEER_ID = var.P2P_PEER_ID
     OCR_TRANSMITTER_ADDRESS = var.OCR_TRANSMITTER_ADDRESS
@@ -154,7 +156,7 @@ resource "kubernetes_stateful_set" "chainlink-node" {
       spec {
         init_container {
           name = "init-chainlink-node"
-          image = "dextrac/chainlink-olympics:${var.chainlink_version}"
+          image = "smartcontract/chainlink:${var.chainlink_version}"
           command = ["bash", "-c", <<EOF
 openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey rsa:2048 -nodes -sha256 -days 365 -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
             EOF
@@ -165,7 +167,7 @@ openssl req -x509 -out  /mnt/tls/server.crt  -keyout /mnt/tls/server.key -newkey
           }
         }
         container {
-          image = "dextrac/chainlink-olympics:${var.chainlink_version}"
+          image = "smartcontract/chainlink:${var.chainlink_version}"
           name  = "chainlink-node"
           port {
             container_port = 6688
